@@ -4,6 +4,9 @@ using System.Threading;
 
 class Program
 {
+    private static int _spinnerIndex = 0; // 旋转符号索引
+    private static readonly char[] _spinnerChars = ['|', '/', '-', '\\']; // 旋转符号序列
+
     static void Main()
     {
         DisplayWelcomeScreen();
@@ -13,13 +16,13 @@ class Program
             Console.Clear();
             DisplayMenu();
 
-            if (!int.TryParse(Console.ReadLine(), out int choice) || choice < 1 || choice > 5)
+            if (!int.TryParse(Console.ReadLine(), out int choice) || choice < 1 || choice > 6)
             {
                 ShowInvalidInputMessage();
                 continue;
             }
 
-            if (choice == 5)
+            if (choice == 6)
             {
                 Console.WriteLine("程序已退出");
                 break;
@@ -31,6 +34,7 @@ class Program
                 2 => 60,
                 3 => 20,
                 4 => 120,
+                5 => 90,
                 _ => 0
             };
 
@@ -45,7 +49,7 @@ class Program
 
         Console.WriteLine("==================================================");
         Console.WriteLine("||                                              ||");
-        Console.WriteLine("||          口语考试模拟倒计时软件 v1.2         ||");
+        Console.WriteLine("||          口语考试模拟倒计时软件 v1.4         ||");
         Console.WriteLine("||      (Oral Exam Timer with High Precision)   ||");
         Console.WriteLine("||                                              ||");
         Console.WriteLine("==================================================");
@@ -55,11 +59,13 @@ class Program
         Console.WriteLine(" - 多种预设考试时间选项");
         Console.WriteLine(" - 倒计时开始/结束提示音");
         Console.WriteLine(" - 实时剩余时间显示");
-        Console.WriteLine(" 提供高精度倒计时和考试提示音功能");
+        Console.WriteLine(" - 提供高精度倒计时和考试提示音功能");
+        Console.WriteLine(" - 流畅旋转进度指示器");
         Console.WriteLine();
         Console.WriteLine(" 更新内容:");
-        Console.WriteLine(" - 添加高精度计时器（毫秒级精度）");
-        Console.WriteLine(" - 最后5秒显示毫秒倒计时");
+        Console.WriteLine(" - 添加90s倒计时");
+        Console.WriteLine(" - 增加旋转符号");
+        Console.WriteLine(" - 简化状态显示");
         Console.WriteLine();
         Console.WriteLine("==================================================");
         Console.ResetColor();
@@ -73,18 +79,19 @@ class Program
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("=== 考试倒计时选项（毫秒级精度） ===");
         Console.ResetColor();
-        Console.WriteLine("1. 10秒 (问题准备/回答)");
+        Console.WriteLine("1. 10秒 (复述准备/重复)");
         Console.WriteLine("2. 60秒 (短文朗读)");
-        Console.WriteLine("3. 20秒 (短文问题回答)");
-        Console.WriteLine("4. 120秒 (交流)");
-        Console.WriteLine("5. 退出程序");
-        Console.Write("\n请选择倒计时时长 (1-5): ");
+        Console.WriteLine("3. 20秒 (短文问题准备/回答)");
+        Console.WriteLine("4. 120秒 (口头对话准备)");
+        Console.WriteLine("5. 90秒 （短文与问题查看/口头对话）");
+        Console.WriteLine("6. 退出程序");
+        Console.Write("\n请选择倒计时时长 (1-6): ");
     }
 
     static void ShowInvalidInputMessage()
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("无效输入，请输入1-5之间的数字!");
+        Console.WriteLine("无效输入，请输入1-6之间的数字!");
         Console.ResetColor();
         Thread.Sleep(1500);
     }
@@ -98,19 +105,32 @@ class Program
 
         BeepAlert(); // 开始提示音
 
-        Stopwatch stopwatch = new Stopwatch();
+        Stopwatch stopwatch = new();
         stopwatch.Start();
 
         TimeSpan totalTime = TimeSpan.FromSeconds(totalSeconds);
         TimeSpan remaining = totalTime;
         TimeSpan lastDisplay = TimeSpan.Zero;
+        DateTime lastSpinnerUpdate = DateTime.MinValue;
+
+        // 初始化旋转符号位置
+        int spinnerLine = 5; // 旋转符号所在行
+        Console.SetCursorPosition(0, spinnerLine);
+        Console.WriteLine("状态: 运行中");
 
         while (remaining.TotalMilliseconds > 0)
         {
             remaining = totalTime - stopwatch.Elapsed;
 
+            // 独立更新旋转符号（每100毫秒更新一次）
+            if ((DateTime.Now - lastSpinnerUpdate).TotalMilliseconds >= 100)
+            {
+                UpdateSpinner(spinnerLine);
+                lastSpinnerUpdate = DateTime.Now;
+            }
+
             // 根据时间动态更新频率
-            bool shouldUpdate = false;
+            bool shouldUpdate;
             if (remaining.TotalSeconds > 5)
             {
                 // 大于5秒时每秒更新
@@ -133,6 +153,10 @@ class Program
 
         DisplayRemainingTime(TimeSpan.Zero, totalSeconds);
 
+        // 停止旋转符号
+        Console.SetCursorPosition(0, spinnerLine);
+        Console.WriteLine("状态: 已完成");
+
         Console.ForegroundColor = ConsoleColor.Magenta;
         Console.WriteLine("\n\n时间到！");
         Console.ResetColor();
@@ -141,6 +165,14 @@ class Program
 
         Console.WriteLine("\n按任意键返回菜单...");
         Console.ReadKey();
+    }
+
+    // 更新旋转符号
+    static void UpdateSpinner(int line)
+    {
+        Console.SetCursorPosition(10, line); // "状态: 运行中" 后面
+        Console.Write(_spinnerChars[_spinnerIndex]);
+        _spinnerIndex = (_spinnerIndex + 1) % _spinnerChars.Length;
     }
 
     static void DisplayRemainingTime(TimeSpan remaining, int totalSeconds)
@@ -169,7 +201,7 @@ class Program
         DrawProgressBar(progress);
     }
 
-    // 修复bug的关键函数：正确格式化分钟和秒
+    // 正确格式化分钟和秒
     static string FormatTime(int totalSeconds)
     {
         if (totalSeconds < 60)
